@@ -1,0 +1,13 @@
+[package]
+name = 'lnconcinnity/aquapackages'
+version = '0.1.0'
+
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+
+exclude = ['wally.toml', 'wally.lock']
+include = ['Packages', 'Packages/']
+
+[dependencies]
+Promise = 'evaera/promise@4.x.x'
+Signal = 'sleitnick/signal@1.x.x'
