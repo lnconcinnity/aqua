@@ -113,4 +113,13 @@ function AquaClient.Drought()
     AquaClient[AQUA_POTS_CONTAINER] = {}
 end
 
+setmetatable(AquaClient, {
+    __index = function(_, key)
+        error("Attempt to read '" .. key .. "'", 2)
+    end,
+    __newindex = function(_, key, _)
+        error("Attempt to write '" .. key .. "'", 2)
+    end
+})
+
 return AquaClient
