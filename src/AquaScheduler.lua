@@ -39,7 +39,7 @@ function AquaScheduleMetatable:Cleanup()
 end
 
 local AquaScheduler = {}
-function AquaScheduler.listen(source: {__heartbeatUpdate: () -> (), __renderUpdate: () -> (), __steppedUpdate: () -> (), RenderPriorityValue: number?})
+function AquaScheduler.listen(source)
     local scheduler = {}
     scheduler.cleanupTasks = {}
     scheduler.priority = if not IS_SERVER then source.RenderPriorityValue or 999 else nil
