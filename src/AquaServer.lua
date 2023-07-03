@@ -88,7 +88,8 @@ function AquaServer.Hydrate(aquaOptions: AquaOptions?)
                 local host = rawHost.new()
                 AquaHosts[name] = host
     
-                local scheduler = AquaScheduler.listen(host)
+                local scheduler = AquaScheduler.new(host)
+                host:__registerScheduler(scheduler)
                 coroutine.wrap(function()
                     xpcall(function()
                         if getN(host.Client) > 0 then
@@ -113,7 +114,6 @@ function AquaServer.Hydrate(aquaOptions: AquaOptions?)
                         end
                     end, error)
                 end)()
-                host:__registerScheduler(scheduler)
     
                 return true
             end))

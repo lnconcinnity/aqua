@@ -93,7 +93,7 @@ function AquaClient.Hydrate(aquaOptions: table)
             local unhydrated = table.remove(UnhydratedPots, #UnhydratedPots)
             table.insert(initPots, Promise.new(function()
                 local pot = unhydrated.new()
-                local scheduler = AquaScheduler.listen(pot)
+                local scheduler = AquaScheduler.new(pot)
                 pot:__registerScheduler(scheduler)
                 if pot.__start then
                     coroutine.wrap(function()

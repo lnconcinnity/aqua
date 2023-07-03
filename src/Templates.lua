@@ -15,7 +15,7 @@ end
 local function makeCleanInternal(class)
     function class:__cleanInternal()
         if self._scheduler then
-            self._scheduler:Cleanup()
+            self._scheduler:cleanup()
             self._scheduler = nil
         end
     end
