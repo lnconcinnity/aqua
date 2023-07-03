@@ -116,7 +116,7 @@ local function Class(defaultProps: {}?)
 	end
 
 	function class.new(...)
-		local self = setmetatable(initSelf(), meta)
+		local self = setmetatable(initSelf(defaultProps), meta)
 		if self.__init then
 			self:__init(...)
 		end
