@@ -36,6 +36,7 @@ function AquaClient.CreatePot(potProps: { Name: string, RenderPriorityValue: num
     setmetatable(class, {__index = potProps})
     table.insert(UnhydratedPots, class)
     Templates.regSched(class)
+    Templates.cleanInternal(class)
     return potProps
 end
 
@@ -45,6 +46,7 @@ function AquaClient.TerminatePot(potName: string)
     if pot.__terminate then
         pot:__terminate()
     end
+    pot:__cleanInternal()
     AquaClient[AQUA_POTS_CONTAINER][potName] = nil
     return pot
 end
@@ -113,6 +115,7 @@ function AquaClient.Drought()
         if pot.__terminate then
             pot:__terminate()
         end
+        pot:__cleanInternal()
     end
     AquaClient[AQUA_POTS_CONTAINER] = {}
 end
