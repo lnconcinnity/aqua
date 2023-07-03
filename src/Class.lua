@@ -2,6 +2,7 @@ local PRIVATE_MARKER = newproxy() -- only the class and inherited class can acce
 local PROTECTED_MARKER = newproxy() -- only the class and inherited can read and write; will only be read-only for other sources
 local INHERITED_MARKER = newproxy()
 local INHERITS_MARKER = newproxy()
+local CONSTANT_MARKER = newproxy() -- cant change after runtime fr
 
 local EXPLICIT_PRIVATE_PREFIX = "_"
 local EXPLICIT_PROTECTED_PREFIX = "__"
@@ -9,6 +10,7 @@ local EXPLICIT_PROTECTED_PREFIX = "__"
 local READ_PRIVATE_NO_ACCESS = "Attempted to read private \"%s\""
 local WRITE_PRIVATE_NO_ACCESS = "Attempted to write private \"%s\" with the value \"%s\""
 local WRITE_PROTECTED_NO_ACCESS = "Attempted to write protected \"%s\" with the value \"%s\""
+local CANNOT_WRITE_CONSTANT = "Attempted to overwrite constant \"%s\""
 
 local EMPTY_STRING = ''
 
@@ -19,6 +21,12 @@ local function canAccessViaInheritance(class)
 		end
 	end
 	return false
+end
+
+local function isAConstant(str: string)
+	str = str:gsub('_', '') -- remove underscores
+	local compare = str:gsub('(%l)', '')
+	return #compare == #str
 end
 
 local function isWithinClassScope(class)
@@ -57,6 +65,14 @@ local function isAccessingPrivate(key)
 	return not isSpecialKey(key) and key:sub(1, 2) ~= EXPLICIT_PROTECTED_PREFIX and key:sub(1, 1) == EXPLICIT_PRIVATE_PREFIX
 end
 
+local function initSelf(defaultProps)
+	local self = if type(defaultProps) == "table" then table.clone(defaultProps) else {}
+	self[PRIVATE_MARKER] = {}
+	self[PROTECTED_MARKER] = {}
+	self[CONSTANT_MARKER] = {}
+	return self
+end
+
 local function Class(defaultProps: {}?)
 	local meta = {}
 	local class = {}
@@ -80,8 +96,10 @@ local function Class(defaultProps: {}?)
 	end
 
 	function meta:__newindex(key, value)
-		local accessingPrivate, accessingProtected = isAccessingPrivate(key), isAccessingProtected(key)
-		if (accessingPrivate or accessingProtected) and not isWithinClassScope(class) then
+		local accessingPrivate, accessingProtected, accesingConstant = isAccessingPrivate(key), isAccessingProtected(key), rawget(self, CONSTANT_MARKER)[key]
+		if accesingConstant then
+			error(string.format(CANNOT_WRITE_CONSTANT, key), 2)
+		elseif (accessingPrivate or accessingProtected) and not isWithinClassScope(class) then
 			error(string.format(
 				if accessingPrivate then WRITE_PRIVATE_NO_ACCESS else WRITE_PROTECTED_NO_ACCESS,
 				tostring(key), tostring(value)), 2)
@@ -98,13 +116,18 @@ local function Class(defaultProps: {}?)
 	end
 
 	function class.new(...)
-		local source = if type(defaultProps) == "table" then table.clone(defaultProps) else {}
-		source[PRIVATE_MARKER] = {}
-		source[PROTECTED_MARKER] = {}
-		local self = setmetatable(source, meta)
+		local self = setmetatable(initSelf(), meta)
 		if self.__init then
 			self:__init(...)
 		end
+
+		-- now check the constants
+		for key, value in pairs(self) do
+			if isAConstant(key) and not type(value) == "function" then
+				self[CONSTANT_MARKER][key] = true
+			end
+		end
+
 		return self
 	end
 	
