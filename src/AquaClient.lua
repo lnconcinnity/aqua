@@ -2,6 +2,8 @@
 local Class = require(script.Parent.Class)
 local Promise = require(script.Parent.Packages.Promise)
 local AquaNetwork = require(script.Parent.AquaNetwork)
+local AquaScheduler = require(script.Parent.AquaScheduler)
+local Templates = require(script.Parent.Templates)
 
 type AquaOptions = {
     Middleware: {
@@ -27,14 +29,14 @@ local AquaHosts = {}
 local AquaClient = {}
 AquaClient[AQUA_CONFIGURATION_TAG] = { Middleware = {}, UsePromise = true }
 AquaClient[AQUA_POTS_CONTAINER] = {}
-function AquaClient.CreatePot(potName: string)
-    assert(#potName > 0, "Argument 1 cannot be an empty string")
-    local wrapper = {}
-    local class = Class { Name = potName }
-    class[AQUA_POT_IDENTIFIER] = potName
-    setmetatable(class, {__index = wrapper})
+function AquaClient.CreatePot(potProps: { Name: string, RenderPriorityValue: number? })
+    assert(#potProps.Name > 0, "Argument 1 cannot be an empty string")
+    local class = Class { Name = potProps.Name, RenderPriorityValue =  potProps.RenderPriorityValue or nil }
+    class[AQUA_POT_IDENTIFIER] = potProps.Name
+    setmetatable(class, {__index = potProps})
     table.insert(UnhydratedPots, class)
-    return wrapper
+    Templates.regSched(class)
+    return potProps
 end
 
 function AquaClient.TerminatePot(potName: string)
@@ -89,6 +91,8 @@ function AquaClient.Hydrate(aquaOptions: table)
             local unhydrated = table.remove(UnhydratedPots, #UnhydratedPots)
             table.insert(initPots, Promise.new(function()
                 local pot = unhydrated.new()
+                local scheduler = AquaScheduler.listen(pot)
+                pot:__registerScheduler(scheduler)
                 if pot.__start then
                     coroutine.wrap(function()
                         xpcall(function()

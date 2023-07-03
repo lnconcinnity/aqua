@@ -2,6 +2,8 @@
 local Class = require(script.Parent.Class)
 local Promise = require(script.Parent.Packages.Promise)
 local AquaNetwork = require(script.Parent.AquaNetwork)
+local Templates = require(script.Parent.Templates)
+local AquaScheduler = require(script.Parent.AquaScheduler)
 
 type AquaOptions = {
     Middleware: {
@@ -38,10 +40,8 @@ function AquaServer.CreateHost(hostProps: { Name: string, Client: {}? })
     local class = Class { Client = hostProps.Client or {}, Name = hostProps.Name }
     AquaHosts[hostProps.Name] = class
     setmetatable(class, {__index = hostProps})
-
-    function class:__registerNet(networkObject)
-        self._networkObject = networkObject
-    end
+    Templates.regNet(class)
+    Templates.regSched(class)
 
     return hostProps
 end
@@ -88,6 +88,7 @@ function AquaServer.Hydrate(aquaOptions: AquaOptions?)
                 local host = rawHost.new()
                 AquaHosts[name] = host
     
+                local scheduler = AquaScheduler.listen(host)
                 coroutine.wrap(function()
                     xpcall(function()
                         if getN(host.Client) > 0 then
@@ -112,6 +113,7 @@ function AquaServer.Hydrate(aquaOptions: AquaOptions?)
                         end
                     end, error)
                 end)()
+                host:__registerScheduler(scheduler)
     
                 return true
             end))
