@@ -86,13 +86,29 @@ local function isAccessingPrivate(key)
 end
 
 local function initSelf(defaultProps)
-	local self = if type(defaultProps) == "table" then table.clone(defaultProps) else {}
-	self[PRIVATE_MARKER] = {}
-	self[PROTECTED_MARKER] = {}
-	self[LOCKED_MARKER] = {}
-	self[INTERNAL_MARKER] = {}
-	self[STRICTIFIY_VALUE_MARKER] = {}
-	return self
+	local markers, realProps = {
+		PRIVATE_MARKER = {},
+		PROTECTED_MARKER = {},
+		LOCKED_MARKER = {},
+		INTERNAL_MARKER = {},
+		STRICTIFIY_VALUE_MARKER = {},
+	}, {}
+	
+	for key, value in pairs(defaultProps) do
+		if isSpecialKey(key) then
+			markers[key] = value
+		else
+			realProps[key] = value
+		end
+	end
+	
+	return markers, realProps
+end
+
+local function pasteSelf(self, props)
+	for key, value in pairs(props) do
+		self[key] = value
+	end
 end
 
 local function Class(defaultProps: {}?)
@@ -137,6 +153,10 @@ local function Class(defaultProps: {}?)
 					error(err or "Failed to set strict property", 2)
 				end
 			end
+			
+			if isAConstant(key) and not rawget(self, INTERNAL_MARKER).__canMakeConstants__ then
+				error("Cannot initialize constant '" .. key .. "', consider using class:__init() for this")
+			end
 
 			if accessingPrivate then
 				rawget(self, PRIVATE_MARKER)[key] = value
@@ -152,7 +172,12 @@ local function Class(defaultProps: {}?)
 	end
 
 	function class.new(...)
-		local self = setmetatable(initSelf(defaultProps), meta)
+		local markers, realProps = initSelf(defaultProps)
+		local self = setmetatable(markers, meta)
+		pasteSelf(self, realProps)
+		
+		self.__canMakeConstants__ = true
+		
 		if self.__init then
 			self:__init(...)
 		end
@@ -163,6 +188,8 @@ local function Class(defaultProps: {}?)
 				self[LOCKED_MARKER][key] = true
 			end
 		end
+		self.__canMakeConstants__ = false
+		self:__lockProperty("__canMakeConstants__")
 
 		return self
 	end
