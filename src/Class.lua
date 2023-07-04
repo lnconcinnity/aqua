@@ -2,6 +2,7 @@ local PRIVATE_MARKER = newproxy() -- only the class and inherited class can acce
 local PROTECTED_MARKER = newproxy() -- only the class and inherited can read and write; will only be read-only for other sources
 local INHERITED_MARKER = newproxy()
 local INHERITS_MARKER = newproxy()
+local STRICTIFIY_VALUE_MARKER = newproxy()
 local CONSTANT_MARKER = newproxy() -- cant change after runtime fr
 
 local EXPLICIT_PRIVATE_PREFIX = "_"
@@ -103,15 +104,25 @@ local function Class(defaultProps: {}?)
 			error(string.format(
 				if accessingPrivate then WRITE_PRIVATE_NO_ACCESS else WRITE_PROTECTED_NO_ACCESS,
 				tostring(key), tostring(value)), 2)
-		elseif accessingPrivate then
-			rawget(self, PRIVATE_MARKER)[key] = value
-		elseif accessingProtected then
-			rawget(self, PROTECTED_MARKER)[key] = value
 		else
-			if key == PROTECTED_MARKER or key == PRIVATE_MARKER then
-				error("Cannot override internal properties", 3)
+			local predicate = rawget(self, STRICTIFIY_VALUE_MARKER)[key]
+			if predicate ~= nil then
+				local ok, err = predicate(value)
+				if not ok then
+					error(err or "Failed to set strict property", 2)
+				end
 			end
-			rawset(self, key, value)
+
+			if accessingPrivate then
+				rawget(self, PRIVATE_MARKER)[key] = value
+			elseif accessingProtected then
+				rawget(self, PROTECTED_MARKER)[key] = value
+			else
+				if key == PROTECTED_MARKER or key == PRIVATE_MARKER then
+					error("Cannot override internal properties", 3)
+				end
+				rawset(self, key, value)
+			end
 		end
 	end
 
@@ -141,6 +152,10 @@ local function Class(defaultProps: {}?)
 		local subClass = Class()
 		setmetatable(subClass, {__index = class})
 		return subClass
+	end
+
+	function class:__strictifyProperty(key: string, predicate: (value: any) -> boolean)
+		self[STRICTIFIY_VALUE_MARKER][key] = predicate
 	end
 
 	return class
