@@ -94,11 +94,13 @@ local function initSelf(defaultProps)
 		STRICTIFIY_VALUE_MARKER = {},
 	}, {}
 	
-	for key, value in pairs(defaultProps) do
-		if isSpecialKey(key) then
-			markers[key] = value
-		else
-			realProps[key] = value
+	if defaultProps then
+		for key, value in pairs(defaultProps) do
+			if isSpecialKey(key) then
+				markers[key] = value
+			else
+				realProps[key] = value
+			end
 		end
 	end
 	
