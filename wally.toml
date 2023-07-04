@@ -1,8 +1,0 @@
-[package]
-name = 'lnconcinnity/aqua'
-description = "A wonderful framework that'll surely refreshen your game! (Modified version of sleitnick's Knit)"
-authors = ['lnconcinnity']
-version = '1.0.0'
-registry = "https://github.com/UpliftGames/wally-index"
-realm = "shared"
-include = ["src", "default.project.json"]
