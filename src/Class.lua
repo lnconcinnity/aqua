@@ -19,7 +19,7 @@ local WRITE_INTERNAL_FAILED = "Cannot write internal property \"%s\""
 local CANNOT_WRITE_CONSTANT = "Attempted to overwrite constant \"%s\""
 local CANNOT_WRITE_LOCKED = "Attempt to overwrite locked property \"%s\""
 
-local MAX_INSIDE_LUA_ATTEMPTS = 3--before error
+local LEVEL_THRESHOLD = 10
 
 local CLONE_IGNORE_PROPERTIES = {'new'}
 
@@ -43,25 +43,20 @@ end
 
 local function isWithinClassScope(class, includeInherited)
 	local level = 2--skip isWithinClassScope and __index or __newindex
-	local attempts = 0
 	local within = false
+	local calledWithinAnonymous = false
 	local calledWithinFunction = false
 	while true do
-		if attempts >= MAX_INSIDE_LUA_ATTEMPTS then
-			break
-		end
 		level += 1
 		local method = debug.info(level, 'f')
-		local isLuaClosure, fnName = pcall(debug.info, method, 'n') -- anonymous and c-functions will return nil and prolly error?
-		if not isLuaClosure then
-			attempts += 1
-		end
 		
-		if hasFunction(class, method) then
+		if level > LEVEL_THRESHOLD and method == nil then
+			calledWithinAnonymous = true
+		elseif hasFunction(class, method) then
 			calledWithinFunction = true
 		end
 		
-		local result = (class[fnName] == method and calledWithinFunction) or (if includeInherited then canAccessViaInheritance(class, method) else false)
+		local result = calledWithinAnonymous or (calledWithinFunction or (if includeInherited then canAccessViaInheritance(class, method) else false))
 		if result then
 			within = true
 			break
