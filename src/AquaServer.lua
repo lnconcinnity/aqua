@@ -39,11 +39,9 @@ function AquaServer.CreateHost(hostProps: { Name: string, Client: {}? })
     assert(not AquaStarted, "Aqua.CreateHost() can only be run before Aqua.Hydrate() is called! (SERVER)")
     local class = Class { Client = hostProps.Client or {}, Name = hostProps.Name }
     AquaHosts[hostProps.Name] = class
-    setmetatable(class, {__index = hostProps})
     Templates.regNet(class)
     Templates.regSched(class)
-
-    return hostProps
+    return class
 end
 
 function AquaServer.GetHost(hostName: string)

@@ -21,6 +21,8 @@ local CANNOT_WRITE_LOCKED = "Attempt to overwrite locked property \"%s\""
 
 local EMPTY_STRING = ''
 
+local CLONE_IGNORE_PROPERTIES = {'new'}
+
 local function hasFunction(class, method)
 	for _, fn in pairs(class) do
 		if type(fn) == "function" and fn == method then
@@ -87,24 +89,30 @@ local function isAccessingPrivate(key)
 	return not isSpecialKey(key) and key:sub(1, 2) ~= EXPLICIT_PROTECTED_PREFIX and key:sub(#key - #EXPLICIT_PROTECTED_PREFIX) ~= EXPLICIT_PROTECTED_PREFIX and key:sub(1, 1) == EXPLICIT_PRIVATE_PREFIX
 end
 
-local function initSelf(defaultProps)
+local function initSelf(class, defaultProps)
 	local markers, realProps = {
 		[PRIVATE_MARKER] = {},
 		[PROTECTED_MARKER] = {},
 		[LOCKED_MARKER] = {},
 		[INTERNAL_MARKER] = {},
 		[STRICTIFIY_VALUE_MARKER] = {},
-		[PUBLIC_MARKER] = {}
+		[PUBLIC_MARKER] = {},
 	}, {}
 	
-	if defaultProps then
-		for key, value in pairs(defaultProps) do
+	local function insert(source)
+		for key, value in pairs(source) do
 			if isSpecialKey(key) then
 				markers[key] = value
 			else
+				if CLONE_IGNORE_PROPERTIES[key] then continue end
 				realProps[key] = value
 			end
 		end
+	end
+	
+	insert(class)
+	if defaultProps then
+		insert(defaultProps)
 	end
 	
 	return markers, realProps
@@ -133,9 +141,9 @@ local function Class(defaultProps: {}?)
 		local public = rawget(self, PUBLIC_MARKER)
 		local protected = rawget(self, PROTECTED_MARKER)
 		if canAccessPrivate or canAccessInternal then
-			return rawget(self, INTERNAL_MARKER)[key] or rawget(self, PRIVATE_MARKER)[key] or protected[key] or public[key] or class[key]
+			return rawget(self, INTERNAL_MARKER)[key] or rawget(self, PRIVATE_MARKER)[key] or protected[key] or public[key]
 		end
-		return protected[key] or public[key] or class[key]
+		return protected[key] or public[key]
 	end
 
 	function meta:__newindex(key, value)
@@ -191,7 +199,7 @@ local function Class(defaultProps: {}?)
 	end
 
 	function class.new(...)
-		local markers, realProps = initSelf(defaultProps)
+		local markers, realProps = initSelf(class, defaultProps)
 		local self = setmetatable(markers, meta)
 		self.__canMakeConstants__ = true
 		self.__canStrictifyProperties__ = true

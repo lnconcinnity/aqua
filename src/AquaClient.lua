@@ -33,11 +33,10 @@ function AquaClient.CreatePot(potProps: { Name: string, RenderPriorityValue: num
     assert(#potProps.Name > 0, "Argument 1 cannot be an empty string")
     local class = Class { Name = potProps.Name, RenderPriorityValue =  potProps.RenderPriorityValue or nil }
     class[AQUA_POT_IDENTIFIER] = potProps.Name
-    setmetatable(class, {__index = potProps})
     table.insert(UnhydratedPots, class)
     Templates.regSched(class)
     Templates.cleanInternal(class)
-    return potProps
+    return class
 end
 
 function AquaClient.TerminatePot(potName: string)
