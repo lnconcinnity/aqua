@@ -6,6 +6,7 @@ local STRICTIFIY_VALUE_MARKER = newproxy()
 local INTERNAL_MARKER = newproxy()
 local PUBLIC_MARKER = newproxy()
 local LOCKED_MARKER = newproxy() -- cant change after runtime fr
+local SIGNAL_MARKER = newproxy()
 
 local EXPLICIT_PRIVATE_PREFIX = "_"
 local EXPLICIT_PROTECTED_PREFIX = "__"
@@ -19,7 +20,9 @@ local WRITE_INTERNAL_FAILED = "Cannot write internal property \"%s\""
 local CANNOT_WRITE_CONSTANT = "Attempted to overwrite constant \"%s\""
 local CANNOT_WRITE_LOCKED = "Attempt to overwrite locked property \"%s\""
 
-local LEVEL_THRESHOLD = 10
+local ATTEMPTS = 5
+local TEST_LEVEL_GOAL = 5
+local SAME_THRESHOLD = 20
 
 local CLONE_IGNORE_PROPERTIES = {'new'}
 
@@ -32,31 +35,34 @@ local function hasFunction(class, method)
 	return false
 end
 
-local function canAccessViaInheritance(class, method)
+local function canAccessViaInheritance(class, methodOrClass)
 	for inherited in pairs(class[INHERITED_MARKER]) do
-		if inherited[INHERITS_MARKER][class] ~= nil and hasFunction(inherited, method) then
+		if (type(methodOrClass) == "table" and inherited == methodOrClass) or hasFunction(inherited, methodOrClass) then
 			return true
 		end
 	end
 	return false
 end
 
-local function isWithinClassScope(class, includeInherited)
-	local level = 2--skip isWithinClassScope and __index or __newindex
+local function testIfIsOnCClosure()
+end
+
+local function isWithinClassScope(class, self, includeInherited)
+	local level = 3--skip pcall, debug.info and __index or __newindex
 	local within = false
 	local calledWithinAnonymous = false
 	local calledWithinFunction = false
 	while true do
 		level += 1
-		local method = debug.info(level, 'f')
+		local _, method = pcall(debug.info, level, 'f')
+		local _, methodName = pcall(debug.info, level, 'n')
+		if not method then break end
 		
-		if level > LEVEL_THRESHOLD and method == nil then
-			calledWithinAnonymous = true
-		elseif hasFunction(class, method) then
+		if hasFunction(class, method) or class[methodName] == method or rawget(self, SIGNAL_MARKER)[method] ~= nil then
 			calledWithinFunction = true
 		end
-		
-		local result = calledWithinAnonymous or (calledWithinFunction or (if includeInherited then canAccessViaInheritance(class, method) else false))
+
+		local result = calledWithinFunction or (if includeInherited then canAccessViaInheritance(class, method) else false)
 		if result then
 			within = true
 			break
@@ -96,6 +102,7 @@ local function initSelf(class, defaultProps)
 		[INTERNAL_MARKER] = {},
 		[STRICTIFIY_VALUE_MARKER] = {},
 		[PUBLIC_MARKER] = {},
+		[SIGNAL_MARKER] = {},
 	}, {}
 
 	local function insert(source)
@@ -130,7 +137,7 @@ local function Class(defaultProps: {}?)
 	class[INHERITED_MARKER] = {}
 
 	function meta:__index(key)
-		local canAccessPrivate, canAccessInternal = isWithinClassScope(class, true), isWithinClassScope(class, false)
+		local canAccessPrivate, canAccessInternal = isWithinClassScope(class, self, true), isWithinClassScope(class, self, false)
 		if isAccessingInternal(key) and not canAccessInternal then
 			error(string.format(READ_INTERNAL_FAILED, key), 2)
 		elseif isAccessingPrivate(key) and not canAccessPrivate then
@@ -161,9 +168,9 @@ local function Class(defaultProps: {}?)
 			error(string.format(
 				if isAConstant(key) then CANNOT_WRITE_CONSTANT else CANNOT_WRITE_LOCKED,
 				key), 2)
-		elseif accessingInternal and not isWithinClassScope(class, false) then
+		elseif accessingInternal and not isWithinClassScope(class, self, false) then
 			error(string.format(WRITE_INTERNAL_FAILED, key), 2)
-		elseif (accessingPrivate or accessingProtected) and not isWithinClassScope(class, true) then
+		elseif (accessingPrivate or accessingProtected) and not isWithinClassScope(class, self, true) then
 			error(string.format(
 				if accessingPrivate then WRITE_PRIVATE_NO_ACCESS else WRITE_PROTECTED_NO_ACCESS,
 				tostring(key), tostring(value)), 2)
@@ -233,6 +240,11 @@ local function Class(defaultProps: {}?)
 		local subClass = Class()
 		setmetatable(subClass, {__index = class})
 		return subClass
+	end
+	
+	function class:__wrapSignal__(signal, handler)
+		self[SIGNAL_MARKER][handler] = true
+		return signal:Connect(handler)
 	end
 
 	function class:__strictifyProperty__(propName: string, predicate: (value: any) -> boolean)
