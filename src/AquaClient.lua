@@ -30,6 +30,7 @@ local AquaClient = {}
 AquaClient[AQUA_CONFIGURATION_TAG] = { Middleware = {}, UsePromise = true }
 AquaClient[AQUA_POTS_CONTAINER] = {}
 function AquaClient.CreatePot(potProps: { Name: string, RenderPriorityValue: number? })
+    assert(type(potProps) == "table", "Argument 1 must be a table")
     assert(#potProps.Name > 0, "Argument 1 cannot be an empty string")
     local class = Class { Name = potProps.Name, RenderPriorityValue =  potProps.RenderPriorityValue or nil }
     class[AQUA_POT_IDENTIFIER] = potProps.Name
@@ -92,6 +93,7 @@ function AquaClient.Hydrate(aquaOptions: table)
             local unhydrated = table.remove(UnhydratedPots, #UnhydratedPots)
             table.insert(initPots, Promise.new(function()
                 local pot = unhydrated.new()
+                
                 local scheduler = AquaScheduler.new(pot)
                 pot:__registerScheduler(scheduler)
                 if pot.__start then

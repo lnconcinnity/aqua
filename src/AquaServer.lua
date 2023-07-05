@@ -35,6 +35,7 @@ local AquaServer = {}
 AquaServer.EventMarker = AQUA_EVENT_MARKER
 AquaServer[AQUA_CONFIGURATION_TAG] = { Middleware = {}, UsePromise = true }
 function AquaServer.CreateHost(hostProps: { Name: string, Client: {}? })
+    assert(type(hostProps) == "table", "Argument 1 must be a table")
     assert(#hostProps.Name > 0, "Argument 1 cannot be an empty string")
     assert(not AquaStarted, "Aqua.CreateHost() can only be run before Aqua.Hydrate() is called! (SERVER)")
     local class = Class { Client = hostProps.Client or {}, Name = hostProps.Name }
@@ -85,7 +86,6 @@ function AquaServer.Hydrate(aquaOptions: AquaOptions?)
             table.insert(initHosts, Promise.new(function()
                 local host = rawHost.new()
                 AquaHosts[name] = host
-    
                 local scheduler = AquaScheduler.new(host)
                 host:__registerScheduler(scheduler)
                 coroutine.wrap(function()
