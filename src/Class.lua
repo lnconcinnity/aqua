@@ -19,7 +19,7 @@ local WRITE_INTERNAL_FAILED = "Cannot write internal property \"%s\""
 local CANNOT_WRITE_CONSTANT = "Attempted to overwrite constant \"%s\""
 local CANNOT_WRITE_LOCKED = "Attempt to overwrite locked property \"%s\""
 
-local EMPTY_STRING = ''
+local MAX_INSIDE_LUA_ATTEMPTS = 3--before error
 
 local CLONE_IGNORE_PROPERTIES = {'new'}
 
@@ -42,22 +42,26 @@ local function canAccessViaInheritance(class, method)
 end
 
 local function isWithinClassScope(class, includeInherited)
-	local level = 1--skip  __index
+	local level = 2--skip isWithinClassScope and __index or __newindex
+	local attempts = 0
 	local within = false
 	local calledWithinFunction = false
 	while true do
+		if attempts >= MAX_INSIDE_LUA_ATTEMPTS then
+			break
+		end
 		level += 1
 		local method = debug.info(level, 'f')
-		local _, fnName = pcall(debug.info, method, 'n') -- anonymous and c-functions will return nil and prolly error?
-		if fnName == EMPTY_STRING then
-			break
+		local isLuaClosure, fnName = pcall(debug.info, method, 'n') -- anonymous and c-functions will return nil and prolly error?
+		if not isLuaClosure then
+			attempts += 1
 		end
 		
 		if hasFunction(class, method) then
 			calledWithinFunction = true
 		end
-
-		local result = (class[fnName] == method or calledWithinFunction) or (if includeInherited then canAccessViaInheritance(class, method) else false)
+		
+		local result = (class[fnName] == method and calledWithinFunction) or (if includeInherited then canAccessViaInheritance(class, method) else false)
 		if result then
 			within = true
 			break
@@ -98,7 +102,7 @@ local function initSelf(class, defaultProps)
 		[STRICTIFIY_VALUE_MARKER] = {},
 		[PUBLIC_MARKER] = {},
 	}, {}
-	
+
 	local function insert(source)
 		for key, value in pairs(source) do
 			if isSpecialKey(key) then
@@ -109,12 +113,12 @@ local function initSelf(class, defaultProps)
 			end
 		end
 	end
-	
+
 	insert(class)
 	if defaultProps then
 		insert(defaultProps)
 	end
-	
+
 	return markers, realProps
 end
 
@@ -148,22 +152,22 @@ local function Class(defaultProps: {}?)
 
 	function meta:__newindex(key, value)
 		local internal, private, protected, public = rawget(self, INTERNAL_MARKER),
-			rawget(self, PRIVATE_MARKER),
-			rawget(self, PROTECTED_MARKER),
-			rawget(self, PUBLIC_MARKER)
+		rawget(self, PRIVATE_MARKER),
+		rawget(self, PROTECTED_MARKER),
+		rawget(self, PUBLIC_MARKER)
 
 		local oldValue = internal[key] or private[key] or protected[key] or public[key]
 		if oldValue == value then
 			return
 		end
-		
+
 		local accessingPrivate, accessingProtected, accessingLocked, accessingInternal = isAccessingPrivate(key), isAccessingProtected(key), rawget(self, LOCKED_MARKER)[key:sub(2)] ~= nil, isAccessingInternal(key)
 		if accessingLocked then
 			error(string.format(
 				if isAConstant(key) then CANNOT_WRITE_CONSTANT else CANNOT_WRITE_LOCKED,
 				key), 2)
 		elseif accessingInternal and not isWithinClassScope(class, false) then
-			error(string.format(WRITE_INTERNAL_FAILED, key), 3)
+			error(string.format(WRITE_INTERNAL_FAILED, key), 2)
 		elseif (accessingPrivate or accessingProtected) and not isWithinClassScope(class, true) then
 			error(string.format(
 				if accessingPrivate then WRITE_PRIVATE_NO_ACCESS else WRITE_PROTECTED_NO_ACCESS,
@@ -176,11 +180,11 @@ local function Class(defaultProps: {}?)
 					error(err or "Failed to set strict property", 2)
 				end
 			end
-						
+
 			if isAConstant(key) and not rawget(self, INTERNAL_MARKER).__canMakeConstants__ then
-				error("Cannot initialize constant '" .. key .. "' after initialization")
+				error("Cannot initialize constant '" .. key .. "' after initialization", 2)
 			end
-			
+
 			if accessingInternal then
 				internal[key] = value
 			elseif accessingPrivate then
@@ -189,7 +193,7 @@ local function Class(defaultProps: {}?)
 				protected[key] = value
 			else
 				if key == PROTECTED_MARKER or key == PRIVATE_MARKER then
-					error("Cannot override internal properties", 3)
+					error("Cannot override internal properties", 2)
 				elseif key:sub(1, 1) == LOCKED_PREFIX then
 					rawget(self, LOCKED_MARKER)[key] = value
 				end
@@ -203,7 +207,7 @@ local function Class(defaultProps: {}?)
 		local self = setmetatable(markers, meta)
 		self.__canMakeConstants__ = true
 		self.__canStrictifyProperties__ = true
-		
+
 		pasteSelf(self, realProps)
 		if self.__init then
 			self:__init(...)
@@ -215,7 +219,7 @@ local function Class(defaultProps: {}?)
 				self[LOCKED_MARKER][LOCKED_PREFIX .. key] = true
 			end
 		end
-		
+
 		self.__canMakeConstants__ = false
 		self:__lockProperty("__canMakeConstants__")
 		self.__canStrictifyProperties__ = false
@@ -235,7 +239,7 @@ local function Class(defaultProps: {}?)
 		setmetatable(subClass, {__index = class})
 		return subClass
 	end
-	
+
 	function class:__strictifyProperty__(propName: string, predicate: (value: any) -> boolean)
 		assert(self.__canStrictifyProperties__ == true, "Cannot strictify properties after initialization")
 		self[STRICTIFIY_VALUE_MARKER][propName] = predicate
