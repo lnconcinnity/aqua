@@ -8,7 +8,7 @@ end
 
 local function makeRegisterScheduler(class)
     assert(getmetatable(class) == nil, "Cannot append with makeRegisterScheduler() to a class object")
-    function class:__registerNet(_scheduler)
+    function class:__registerScheduler(_scheduler)
         self._scheduler = _scheduler
         self:__lockProperty('_scheduler')
     end
