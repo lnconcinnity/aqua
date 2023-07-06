@@ -242,21 +242,19 @@ local function Class(defaultProps: {}?)
 
 	function class:__registerCHandler__(handler)
 		self[C_HANDLERS_MARKER][handler] = true
+		return handler
 	end
 	
 	function class:__wrapSignal(signal, handler)
-		self:__registerCHandler__(handler)
-		return signal:Connect(handler)
+		return signal:Connect(self:__registerCHandler__(handler))
 	end
 	
 	function class:__wrapCoroutine(coroutine, handler)
-		self:__registerCHandler__(handler)
-		return coroutine(handler)
+		return coroutine(self:__registerCHandler__(handler))
 	end
 	
 	function class:__wrapTask(task, handler)
-		self:__registerCHandler__(handler)
-		return task(handler)
+		return task(self:__registerCHandler__(handler))
 	end
 
 	function class:__lockProperty(propName: string)
