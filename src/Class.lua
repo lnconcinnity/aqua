@@ -239,19 +239,23 @@ local function Class(defaultProps: {}?)
 		assert(self.__canStrictifyProperties__ == true, "Cannot strictify properties after initialization")
 		self[STRICTIFIY_VALUE_MARKER][propName] = predicate
 	end
+
+	function class:__registerCHandler__(handler)
+		self[C_HANDLERS_MARKER][handler] = true
+	end
 	
 	function class:__wrapSignal(signal, handler)
-		self[C_HANDLERS_MARKER][handler] = true
+		self:__registerCHandler__(handler)
 		return signal:Connect(handler)
 	end
 	
 	function class:__wrapCoroutine(coroutine, handler)
-		self[C_HANDLERS_MARKER][handler] = true
+		self:__registerCHandler__(handler)
 		return coroutine(handler)
 	end
 	
 	function class:__wrapTask(task, handler)
-		self[C_HANDLERS_MARKER][handler] = true
+		self:__registerCHandler__(handler)
 		return task(handler)
 	end
 

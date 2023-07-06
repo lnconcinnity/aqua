@@ -15,21 +15,22 @@ function AquaScheduler:onRenderStepped(fn: (dt: number) -> (), overridePriority:
     assert(not IS_SERVER, "Scheduler:onRenderStepped() can only")
     if overridePriority or (type(self.renderPriority) == "number" and self.renderPriority > 0) then
         local id = HttpService:GenerateGUID(false)
+        self:__registerCHandler__(fn)
         RunService:BindToRenderStep(id, overridePriority or self.renderPriority, fn)
         table.insert(self.cleanupTasks, function()
             RunService:UnbindFromRenderStep(id)
         end)
     else
-        table.insert(self.cleanupTasks, RunService.RenderStepped:Connect(fn))
+        table.insert(self.cleanupTasks, self:__wrapSignal(RunService.RenderStepped, fn))
     end
 end
 
 function AquaScheduler:onHeartbeat(fn: (dt: number) -> ())
-    table.insert(self.cleanupTasks, RunService.Heartbeat:Connect(fn))
+    table.insert(self.cleanupTasks, self:__wrapSignal(RunService.Heartbeat, fn))
 end
 
 function AquaScheduler:onStepped(fn: (t: number, dt: number) -> ())
-    table.insert(self.cleanupTasks, RunService.Stepped:Connect(fn))
+    table.insert(self.cleanupTasks, self:__wrapSignal(RunService.Stepped, fn))
 end
 
 function AquaScheduler:cleanup()
