@@ -9,28 +9,29 @@ local AquaScheduler = Class {}
 function AquaScheduler:__init(source)
     self._cleanupTasks = {}
     self.__priority = if not IS_SERVER then source.RenderPriorityValue or 999 else nil
+    self.__source__ = source
 end
 
 function AquaScheduler:onRenderStepped(fn: (dt: number) -> (), overridePriority: number?)
     assert(not IS_SERVER, "Scheduler:onRenderStepped() can only")
     if overridePriority or (type(self.renderPriority) == "number" and self.renderPriority > 0) then
         local id = HttpService:GenerateGUID(false)
-        self:__registerCHandler__(fn)
+        self.__source__:__registerCHandler__(fn)
         RunService:BindToRenderStep(id, overridePriority or self.renderPriority, fn)
         table.insert(self.cleanupTasks, function()
             RunService:UnbindFromRenderStep(id)
         end)
     else
-        table.insert(self.cleanupTasks, self:__wrapSignal(RunService.RenderStepped, fn))
+        table.insert(self.cleanupTasks, self.__source__:__wrapSignal(RunService.RenderStepped, fn))
     end
 end
 
 function AquaScheduler:onHeartbeat(fn: (dt: number) -> ())
-    table.insert(self.cleanupTasks, self:__wrapSignal(RunService.Heartbeat, fn))
+    table.insert(self.cleanupTasks, self.__source__:__wrapSignal(RunService.Heartbeat, fn))
 end
 
 function AquaScheduler:onStepped(fn: (t: number, dt: number) -> ())
-    table.insert(self.cleanupTasks, self:__wrapSignal(RunService.Stepped, fn))
+    table.insert(self.cleanupTasks, self.__source__:__wrapSignal(RunService.Stepped, fn))
 end
 
 function AquaScheduler:cleanup()
