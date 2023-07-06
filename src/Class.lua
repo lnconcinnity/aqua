@@ -141,7 +141,10 @@ local function Class(defaultProps: {}?)
 		local protected = rawget(self, PROTECTED_MARKER)
 		local result = protected[key] or public[key]
 		if canAccessPrivate or canAccessInternal then
-			result = rawget(self, INTERNAL_MARKER)[key] or rawget(self, PRIVATE_MARKER)[key] or result
+			local foundInternal = rawget(self, INTERNAL_MARKER)[key]
+			if foundInternal ~= nil then return foundInternal end
+			local foundPrivate = rawget(self, PRIVATE_MARKER)[key]
+			if foundPrivate ~= nil then return foundPrivate end
 		end
 		return result
 	end
