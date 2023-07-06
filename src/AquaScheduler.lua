@@ -16,8 +16,7 @@ function AquaScheduler:onRenderStepped(fn: (dt: number) -> (), overridePriority:
     assert(not IS_SERVER, "Scheduler:onRenderStepped() can only")
     if overridePriority or (type(self.renderPriority) == "number" and self.renderPriority > 0) then
         local id = HttpService:GenerateGUID(false)
-        self.__source__:__registerCHandler__(fn)
-        RunService:BindToRenderStep(id, overridePriority or self.renderPriority, fn)
+        RunService:BindToRenderStep(id, overridePriority or self.renderPriority, self.__source__:__registerCHandler__(fn))
         table.insert(self.cleanupTasks, function()
             RunService:UnbindFromRenderStep(id)
         end)

@@ -139,10 +139,11 @@ local function Class(defaultProps: {}?)
 
 		local public = rawget(self, PUBLIC_MARKER)
 		local protected = rawget(self, PROTECTED_MARKER)
+		local result = protected[key] or public[key]
 		if canAccessPrivate or canAccessInternal then
-			return rawget(self, INTERNAL_MARKER)[key] or rawget(self, PRIVATE_MARKER)[key] or protected[key] or public[key]
+			result = rawget(self, INTERNAL_MARKER)[key] or rawget(self, PRIVATE_MARKER)[key] or result
 		end
-		return protected[key] or public[key]
+		return result
 	end
 
 	function meta:__newindex(key, value)
@@ -210,6 +211,9 @@ local function Class(defaultProps: {}?)
 		for key, value in pairs(self) do
 			if isAConstant(key) and type(value) ~= "function" then
 				self[LOCKED_MARKER][key] = true
+				if type(value) == "table" then
+					table.freeze(value)
+				end
 			end
 		end
 
